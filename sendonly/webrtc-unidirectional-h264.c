@@ -59,116 +59,6 @@ struct _ReceiverEntry
   GstElement *webrtcbin;
 };
 
-
-
-const gchar *html_source = " \n \
-<html> \n \
-  <head> \n \
-    <script type=\"text/javascript\" src=\"https://webrtc.github.io/adapter/adapter-latest.js\"></script> \n \
-    <script type=\"text/javascript\"> \n \
-      var html5VideoElement; \n \
-      var websocketConnection; \n \
-      var webrtcPeerConnection; \n \
-      var webrtcConfiguration; \n \
-      var reportError; \n \
- \n \
- \n \
-      function onLocalDescription(desc) { \n \
-        console.log(\"Local description: \" + JSON.stringify(desc)); \n \
-        webrtcPeerConnection.setLocalDescription(desc).then(function() { \n \
-          websocketConnection.send(JSON.stringify({ type: \"sdp\", \"data\": webrtcPeerConnection.localDescription })); \n \
-        }).catch(reportError); \n \
-      } \n \
- \n \
- \n \
-      function onIncomingSDP(sdp) { \n \
-        console.log(\"Incoming SDP: \" + JSON.stringify(sdp)); \n \
-        webrtcPeerConnection.setRemoteDescription(sdp).catch(reportError); \n \
-        webrtcPeerConnection.createAnswer().then(onLocalDescription).catch(reportError); \n \
-      } \n \
- \n \
- \n \
-      function onIncomingICE(ice) { \n \
-        var candidate = new RTCIceCandidate(ice); \n \
-        console.log(\"Incoming ICE: \" + JSON.stringify(ice)); \n \
-        webrtcPeerConnection.addIceCandidate(candidate).catch(reportError); \n \
-      } \n \
- \n \
- \n \
-      function onAddRemoteStream(event) { \n \
-        html5VideoElement.srcObject = event.streams[0]; \n \
-      } \n \
- \n \
- \n \
-      function onIceCandidate(event) { \n \
-        if (event.candidate == null) \n \
-          return; \n \
- \n \
-        console.log(\"Sending ICE candidate out: \" + JSON.stringify(event.candidate)); \n \
-        websocketConnection.send(JSON.stringify({ \"type\": \"ice\", \"data\": event.candidate })); \n \
-      } \n \
- \n \
- \n \
-      function onServerMessage(event) { \n \
-        var msg; \n \
- \n \
-        try { \n \
-          msg = JSON.parse(event.data); \n \
-        } catch (e) { \n \
-          return; \n \
-        } \n \
- \n \
-        if (!webrtcPeerConnection) { \n \
-          webrtcPeerConnection = new RTCPeerConnection(webrtcConfiguration); \n \
-          webrtcPeerConnection.ontrack = onAddRemoteStream; \n \
-          webrtcPeerConnection.onicecandidate = onIceCandidate; \n \
-        } \n \
- \n \
-        switch (msg.type) { \n \
-          case \"sdp\": onIncomingSDP(msg.data); break; \n \
-          case \"ice\": onIncomingICE(msg.data); break; \n \
-          default: break; \n \
-        } \n \
-      } \n \
- \n \
- \n \
-      function playStream(videoElement, hostname, port, path, configuration, reportErrorCB) { \n \
-        var l = window.location;\n \
-        var wsHost = (hostname != undefined) ? hostname : l.hostname; \n \
-        var wsPort = (port != undefined) ? port : l.port; \n \
-        var wsPath = (path != undefined) ? path : \"ws\"; \n \
-        if (wsPort) \n\
-          wsPort = \":\" + wsPort; \n\
-        var wsUrl = \"ws://\" + wsHost + wsPort + \"/\" + wsPath; \n \
- \n \
-        html5VideoElement = videoElement; \n \
-        webrtcConfiguration = configuration; \n \
-        reportError = (reportErrorCB != undefined) ? reportErrorCB : function(text) {}; \n \
- \n \
-        websocketConnection = new WebSocket(wsUrl); \n \
-        websocketConnection.addEventListener(\"message\", onServerMessage); \n \
-      } \n \
- \n \
-      window.onload = function() { \n \
-        var vidstream = document.getElementById(\"stream\"); \n \
-        var config = { 'iceServers': [{ 'urls': 'stun:" STUN_SERVER "' }] }; \n\
-        playStream(vidstream, null, null, null, config, function (errmsg) { console.error(errmsg); }); \n \
-      }; \n \
- \n \
-    </script> \n \
-  </head> \n \
- \n \
-  <body> \n \
-    <div> \n \
-      <video id=\"stream\" autoplay playsinline>Your browser does not support video</video> \n \
-    </div> \n \
-  </body> \n \
-</html> \n \
-";
-
-
-
-
 ReceiverEntry *
 create_receiver_entry (SoupWebsocketConnection * connection)
 {
@@ -187,11 +77,11 @@ create_receiver_entry (SoupWebsocketConnection * connection)
 
   error = NULL;
   receiver_entry->pipeline = gst_parse_launch ("webrtcbin name=webrtcbin stun-server=stun://" STUN_SERVER " "
-      "videotestsrc pattern=snow ! video/x-raw,width=640,height=360,framerate=15/1 ! videoconvert ! queue max-size-buffers=1 ! x264enc bitrate=600 speed-preset=ultrafast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue max-size-time=100000000 ! h264parse ! "
+      "videotestsrc pattern=smpte ! video/x-raw,width=640,height=360,framerate=24/1 ! videoconvert ! queue max-size-buffers=1 ! x264enc bitrate=5000 speed-preset=fast tune=zerolatency key-int-max=15 ! video/x-h264,profile=constrained-baseline ! queue max-size-time=100000000 ! h264parse ! "
       "rtph264pay config-interval=-1 name=payloader ! "
       "application/x-rtp,media=video,encoding-name=H264,payload="
       RTP_PAYLOAD_TYPE " ! webrtcbin. "
-      "audiotestsrc is-live=true wave=white-noise ! audioconvert ! audioresample ! queue ! opusenc ! rtpopuspay ! application/x-rtp,media=audio,encoding-name=OPUS,payload=97 ! webrtcbin. " , &error);
+      "audiotestsrc is-live=true wave=violet-noise ! audioconvert ! audioresample ! queue ! opusenc ! rtpopuspay ! application/x-rtp,media=audio,encoding-name=OPUS,payload=97 ! webrtcbin. " , &error);
   if (error != NULL) {
     g_error ("Could not create WebRTC pipeline: %s\n", error->message);
     g_error_free (error);
@@ -479,31 +369,6 @@ soup_websocket_closed_cb (SoupWebsocketConnection * connection,
 
 
 void
-soup_http_handler (G_GNUC_UNUSED SoupServer * soup_server,
-    SoupMessage * message, const char *path, G_GNUC_UNUSED GHashTable * query,
-    G_GNUC_UNUSED SoupClientContext * client_context,
-    G_GNUC_UNUSED gpointer user_data)
-{
-  SoupBuffer *soup_buffer;
-
-  if ((g_strcmp0 (path, "/") != 0) && (g_strcmp0 (path, "/index.html") != 0)) {
-    soup_message_set_status (message, SOUP_STATUS_NOT_FOUND);
-    return;
-  }
-
-  soup_buffer =
-      soup_buffer_new (SOUP_MEMORY_STATIC, html_source, strlen (html_source));
-
-  soup_message_headers_set_content_type (message->response_headers, "text/html",
-      NULL);
-  soup_message_body_append_buffer (message->response_body, soup_buffer);
-  soup_buffer_free (soup_buffer);
-
-  soup_message_set_status (message, SOUP_STATUS_OK);
-}
-
-
-void
 soup_websocket_handler (G_GNUC_UNUSED SoupServer * server,
     SoupWebsocketConnection * connection, G_GNUC_UNUSED const char *path,
     G_GNUC_UNUSED SoupClientContext * client_context, gpointer user_data)
@@ -573,7 +438,6 @@ main (int argc, char *argv[])
 
   soup_server =
       soup_server_new (SOUP_SERVER_SERVER_HEADER, "webrtc-soup-server", NULL);
-  soup_server_add_handler (soup_server, "/", soup_http_handler, NULL, NULL);
   soup_server_add_websocket_handler (soup_server, "/ws", NULL, NULL,
       soup_websocket_handler, (gpointer) receiver_entry_table, NULL);
   soup_server_listen_all (soup_server, SOUP_HTTP_PORT,
